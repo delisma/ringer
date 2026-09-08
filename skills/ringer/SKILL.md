@@ -1,0 +1,1 @@
+../../.claude/skills/ringer/SKILL.md
