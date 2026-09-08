@@ -6052,6 +6052,17 @@ def model_log_row_task_type(row: dict[str, Any]) -> str:
     return task_type or "(untyped)"
 
 
+def model_log_group_key(row: dict[str, Any]) -> tuple[str, str, str, str, bool]:
+    unattributed = model_log_row_is_unattributed(row)
+    return (
+        model_log_row_engine(row),
+        model_log_row_model(row),
+        model_log_row_task_type(row),
+        "" if unattributed else (model_log_row_reasoning_effort(row) or ""),
+        unattributed,
+    )
+
+
 def model_log_int(value: Any) -> int | None:
     if isinstance(value, bool) or value is None:
         return None
@@ -6101,6 +6112,16 @@ def group_model_log_tasks(rows: list[dict[str, Any]]) -> list[list[dict[str, Any
     return grouped
 
 
+def ordered_model_log_task_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            model_log_text(row.get("logged_at")),
+            1 if model_log_row_is_retry(row) else 0,
+        ),
+    )
+
+
 def read_model_log_rows(
     path: Path,
     *,
@@ -6129,13 +6150,7 @@ def read_model_log_rows(
     if since is not None:
         selected_row_ids: set[int] = set()
         for task_rows in group_model_log_tasks(rows):
-            ordered = sorted(
-                task_rows,
-                key=lambda row: (
-                    model_log_text(row.get("logged_at")),
-                    1 if model_log_row_is_retry(row) else 0,
-                ),
-            )
+            ordered = ordered_model_log_task_rows(task_rows)
             final_date = parse_log_date(ordered[-1].get("logged_at"))
             if final_date and final_date >= since:
                 selected_row_ids.update(id(row) for row in task_rows)
@@ -6152,13 +6167,7 @@ def aggregate_model_log_rows(
     groups: dict[tuple[str, str, str, str, bool], dict[str, Any]] = {}
     effort_keys = model_reasoning_effort_keys(rows)
     for task_rows in group_model_log_tasks(rows):
-        ordered = sorted(
-            task_rows,
-            key=lambda row: (
-                model_log_text(row.get("logged_at")),
-                1 if model_log_row_is_retry(row) else 0,
-            ),
-        )
+        ordered = ordered_model_log_task_rows(task_rows)
         first = ordered[0]
         final = ordered[-1]
         if model_log_row_is_reserved_fixture(final):
@@ -6172,13 +6181,7 @@ def aggregate_model_log_rows(
             continue
         if task_type is not None and group_task_type != task_type:
             continue
-        key = (
-            group_engine,
-            group_model,
-            group_task_type,
-            reasoning_effort or "",
-            unattributed,
-        )
+        key = model_log_group_key(final)
         group = groups.setdefault(
             key,
             {
@@ -8738,6 +8741,119 @@ def run_models_command(config: AppConfig, args: argparse.Namespace) -> int:
     return 0
 
 
+def learn_task_measurements(
+    rows: list[dict[str, Any]],
+) -> dict[tuple[str, str, str, str, bool], list[tuple[int | None, int | None]]]:
+    measurements: dict[
+        tuple[str, str, str, str, bool], list[tuple[int | None, int | None]]
+    ] = {}
+    for task_rows in group_model_log_tasks(rows):
+        ordered = ordered_model_log_task_rows(task_rows)
+        final = ordered[-1]
+        if model_log_row_is_reserved_fixture(final):
+            continue
+        tokens = [model_log_int(row.get("worker_tokens")) for row in ordered]
+        durations = [model_log_int(row.get("duration_ms")) for row in ordered]
+        task_tokens = sum(tokens) if all(value is not None for value in tokens) else None
+        task_duration_ms = (
+            sum(durations) if all(value is not None for value in durations) else None
+        )
+        measurements.setdefault(model_log_group_key(final), []).append(
+            (task_tokens, task_duration_ms)
+        )
+    return measurements
+
+
+def format_learn_token_count(value: int | None) -> str:
+    if value is None:
+        return "?k"
+    return f"{(value + 500) // 1000}k"
+
+
+def format_learn_duration(value_ms: int | None) -> str:
+    if value_ms is None:
+        return "?s"
+    return f"{(value_ms + 500) // 1000}s"
+
+
+def run_learn_command(config: AppConfig, args: argparse.Namespace) -> int:
+    log_path = (args.log or config.eval.jsonl_path).expanduser().resolve()
+    notes_path = (args.notes_file or default_model_notes_path()).expanduser().resolve()
+    rows, _skipped = read_model_log_rows(log_path)
+    run_id = model_log_text(args.run_id)
+    if not run_id:
+        if not rows:
+            print(f"learn: no rows found in {log_path}", file=sys.stderr)
+            return 1
+        run_id = model_log_text(rows[-1].get("run_id"))
+        if not run_id:
+            print(f"learn: last row in {log_path} has no run_id", file=sys.stderr)
+            return 1
+
+    run_rows = [row for row in rows if model_log_text(row.get("run_id")) == run_id]
+    if not run_rows:
+        print(f"learn: run_id {run_id!r} was not found in {log_path}", file=sys.stderr)
+        return 1
+
+    groups = aggregate_model_log_rows(run_rows)
+    measurements = learn_task_measurements(run_rows)
+    notes_sections = parse_model_notes_sections(notes_path)
+    display_run_id = re.sub(r"-\d{8}T\d{6}Z-p\d+$", "", run_id)
+    today = datetime.now(timezone.utc).date().isoformat()
+    drafts: list[str] = []
+    for group in groups:
+        model = str(group["model"])
+        matched_heading = next(
+            (heading for heading in notes_sections if model in heading),
+            None,
+        )
+        if matched_heading is None:
+            heading = f'## NEW SECTION SUGGESTED: "{model} ({group["engine"]})"'
+        else:
+            heading = f'## existing section: "{matched_heading}"'
+
+        tasks = int(group["tasks"])
+        passed = int(group["passed"])
+        first_try_passed = int(round(float(group["first_try_pass_rate"]) * tasks))
+        retry_passed = passed - first_try_passed
+        effort = group.get("reasoning_effort")
+        task_label = f"{tasks} tasks"
+        if effort:
+            task_label += f", effort={effort}"
+        retry_label = f" (+{retry_passed} on retry)" if retry_passed > 0 else ""
+        key = (
+            str(group["engine"]),
+            model,
+            str(group["task_type"]),
+            str(effort or ""),
+            bool(group["unattributed"]),
+        )
+        task_measurements = measurements.get(key, [])
+        token_list = "/".join(
+            format_learn_token_count(tokens) for tokens, _duration in task_measurements
+        )
+        duration_list = "/".join(
+            format_learn_duration(duration) for _tokens, duration in task_measurements
+        )
+        bullet = (
+            f"- {today} {group['task_type']} ({display_run_id}, {task_label}): "
+            f"{first_try_passed}/{tasks} first-try{retry_label}. "
+            f"{token_list} tokens, {duration_list}. "
+            "[LESSON: fill in -- the tool cannot infer this from logs alone.]"
+        )
+        drafts.append(f"{heading}\n\n{bullet}")
+
+    draft_text = "\n\n".join(drafts) + "\n"
+    if args.out is None:
+        print(draft_text, end="")
+        return 0
+    out_path = args.out.expanduser()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(draft_text, encoding="utf-8")
+    print(f"learn: wrote draft to {out_path}")
+    return 0
+
+
 class Verifier:
     async def verify(self, task: TaskSpec, taskdir: Path) -> VerifyResult:
         check_returncode, check_timed_out, output = await self._run_check(task.check, taskdir)
@@ -11124,6 +11240,13 @@ def build_parser() -> argparse.ArgumentParser:
     models_parser.add_argument("--open", action="store_true", help="render the HTML scoreboard to the artifact library and open it")
     models_parser.add_argument("--json", action="store_true", help="print the scoreboard as JSON")
 
+    learn_parser = subparsers.add_parser("learn", help="draft MODEL-NOTES.md entries from one run")
+    learn_parser.add_argument("run_id", nargs="?", help="run_id to draft (default: last row in the log)")
+    learn_parser.add_argument("--config", type=Path, default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    learn_parser.add_argument("--log", type=Path, help="path to local eval JSONL log")
+    learn_parser.add_argument("--notes-file", type=Path, default=default_model_notes_path(), help="path to MODEL-NOTES.md judgment layer")
+    learn_parser.add_argument("--out", type=Path, help="write the draft to this path")
+
     catalog_parser = subparsers.add_parser("catalog", help="show or refresh the local OpenRouter model catalog")
     catalog_parser.add_argument("--refresh", action="store_true", help="fetch source and rewrite the local snapshot")
     catalog_parser.add_argument("--source", help=f"OpenRouter models URL or fixture file (default: {DEFAULT_CATALOG_SOURCE})")
@@ -11221,6 +11344,8 @@ def main(argv: list[str] | None = None) -> int:
             return run_db_command(config, args)
         if args.command == "models":
             return run_models_command(config, args)
+        if args.command == "learn":
+            return run_learn_command(config, args)
         if args.command == "hud":
             return run_persistent_hud(
                 config,
