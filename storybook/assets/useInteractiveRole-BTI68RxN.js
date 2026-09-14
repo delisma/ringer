@@ -1,0 +1,1 @@
+import{aj as e}from"./iframe-CJeV72rj.js";const n=e.createContext(null);n.displayName="InteractiveRoleContext";function u(){return e.use(n)}function i({href:r,onClick:o,isDisabled:l=!1}){const t=u();return r!=null&&!l?"link":o!=null?"button":t??"inert"}export{n as I,i as u};
