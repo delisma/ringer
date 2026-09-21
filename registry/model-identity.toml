@@ -78,6 +78,20 @@ confidence = "verified"
 source = "manifest model field; OpenRouter slug z-ai/glm-5.2"
 last_verified = 2026-07-10
 
+[engines.opencode.models."openrouter/z-ai/glm-5.3"]
+display = "GLM 5.3"
+lab = "Z.ai (Zhipu AI)"
+confidence = "verified"
+source = "manifest model field; OpenRouter slug z-ai/glm-5.3"
+last_verified = 2026-09-19
+
+[engines.opencode.models."openrouter/z-ai/glm-5.3-flash"]
+display = "GLM 5.3 Flash"
+lab = "Z.ai (Zhipu AI)"
+confidence = "verified"
+source = "manifest model field; OpenRouter slug z-ai/glm-5.3-flash"
+last_verified = 2026-09-19
+
 [engines.opencode.models."openrouter/moonshotai/kimi-k2.7-code"]
 display = "Kimi K2.7 Code"
 lab = "Moonshot AI"
@@ -91,6 +105,13 @@ lab = "NVIDIA"
 confidence = "verified"
 source = "manifest model field; OpenRouter slug nvidia/nemotron-3-super-120b-a12b:free"
 last_verified = 2026-07-10
+
+[engines.opencode.models."openrouter/deepseek/deepseek-v4-flash-0731:free"]
+display = "DeepSeek V4 Flash 0731 (free)"
+lab = "DeepSeek"
+confidence = "verified"
+source = "manifest model field; OpenRouter slug deepseek/deepseek-v4-flash-0731:free"
+last_verified = 2026-09-19
 
 [engines.opencode.models."openrouter/meta-llama/llama-3.3-70b-instruct:free"]
 display = "Llama 3.3 70B Instruct (free)"
