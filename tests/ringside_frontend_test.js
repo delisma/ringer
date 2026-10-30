@@ -194,6 +194,7 @@ const models = {
 };
 const data = {
   "/api/runs": {
+    build: "abc1234 · 2026-10-29",
     runs: [
       run,
       {
@@ -230,6 +231,13 @@ const data = {
 (async () => {
   const env = environment(data);
   await settle();
+  assert.equal(env.el("build").textContent, "abc1234 · 2026-10-29");
+  assert.equal(env.el("build").hidden, false);
+  data["/api/runs"] = { runs: data["/api/runs"].runs };
+  env.timers.find((t) => t.ms === 1000).fn();
+  await settle();
+  assert.equal(env.el("build").textContent, "");
+  assert.equal(env.el("build").hidden, true);
   assert.match(env.el("task-inspector").innerHTML, /Retrying · attempt 2 of 3/);
   assert.match(
     env.el("task-inspector").innerHTML,
@@ -324,7 +332,7 @@ const data = {
   assert.match(empty.el("run-picker").innerHTML, /No runs yet/);
   assert.equal(empty.el("open-folder").disabled, true);
   console.log(
-    "PASS: retry evidence, escaping, task search, raw logs, model filtering, dead workers, saved versions, reconnect, native compact/expand, empty states",
+    "PASS: footer build string, retry evidence, escaping, task search, raw logs, model filtering, dead workers, saved versions, reconnect, native compact/expand, empty states",
   );
 })().catch((error) => {
   console.error(error);

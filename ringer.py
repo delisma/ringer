@@ -5609,6 +5609,7 @@ class PersistentHudServer:
         self.model_db_path: Path | None = None
         self.model_notes_path: Path | None = None
         self.update_status: dict[str, Any] | None = None
+        self.build_info: str | None = None
         self.last_viewer_ping: float | None = None
 
     def start(self) -> int:
@@ -5665,6 +5666,7 @@ class PersistentHudServer:
                             "runs": scan_hud_run_states(state_dir),
                             "active": read_active_runs_file(),
                             "update": server_ref.update_status,
+                            "build": server_ref.build_info,
                         },
                     )
                     return
@@ -10869,6 +10871,35 @@ def current_repo_head(
     return head or None
 
 
+def ringer_build_string(
+    repo_dir: Path | None = None,
+    *,
+    runner: Any = subprocess.run,
+) -> str | None:
+    """Return the short Ringer build string for the repository."""
+    repo = (repo_dir or Path(__file__).resolve().parent).resolve()
+    git_bin = shutil.which("git")
+    if git_bin is None or not (repo / ".git").exists():
+        return None
+    try:
+        result = _run_self_update_git(
+            runner, git_bin, repo, "show", "-s", "--format=%h %cs", "HEAD"
+        )
+    except Exception:
+        return None
+    fields = str(result.stdout).strip().split() if result.returncode == 0 else []
+    if len(fields) != 2:
+        return None
+    build = f"{fields[0]} · {fields[1]}"
+    try:
+        result = _run_self_update_git(runner, git_bin, repo, "status", "--porcelain")
+    except Exception:
+        return build
+    if result.returncode == 0 and str(result.stdout).strip():
+        return f"{build} · dirty"
+    return build
+
+
 def hud_should_restart(
     recorded_running_head: str | None,
     disk_head: str | None,
@@ -11026,6 +11057,7 @@ def run_persistent_hud(
     repo_dir = Path(__file__).resolve().parent
     running_head = current_repo_head(repo_dir)
     server.update_status = self_update_dashboard_status(config.state_dir, repo_dir)
+    server.build_info = ringer_build_string(repo_dir)
     server.start()
     start_hud_update_maintenance(
         config,

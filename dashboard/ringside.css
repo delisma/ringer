@@ -240,6 +240,15 @@ h3 {
   font-size: 11px;
   padding: 22px 32px;
 }
+.build {
+  margin-left: 4px;
+  color: inherit;
+  font-size: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.build::before {
+  content: "· ";
+}
 .summary {
   display: flex;
   gap: 12px;

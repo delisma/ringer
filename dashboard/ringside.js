@@ -660,6 +660,10 @@
         const payload = await request("/api/runs");
         state.hudRunsAvailable = true;
         applyRuns(payload);
+        const build =
+          typeof payload.build === "string" ? payload.build.trim() : "";
+        $("build").textContent = build;
+        $("build").hidden = !build;
         const update = payload.update;
         const k = JSON.stringify(update);
         $("update-banner").hidden = !(

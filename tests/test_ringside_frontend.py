@@ -41,6 +41,11 @@ class RingsideFrontendTests(unittest.TestCase):
         with self.assertRaises(Exception):
             urlopen(self.base+"/assets/../../ringer.py", timeout=5)
 
+    def test_runs_payload_includes_build_info(self) -> None:
+        self.server.build_info = "abc1234 · 2026-10-29"
+        with urlopen(self.base+"/api/runs", timeout=5) as response:
+            self.assertEqual("abc1234 · 2026-10-29", json.loads(response.read())["build"])
+
     def test_open_folder_uses_selected_version_run(self) -> None:
         directory = self.root / "artifacts" / "deliverables" / "saved-run"
         directory.mkdir(parents=True)
@@ -55,6 +60,44 @@ class RingsideFrontendTests(unittest.TestCase):
         result = subprocess.run(["node",str(ROOT / "tests" / "ringside_frontend_test.js")],capture_output=True,text=True,timeout=15)
         self.assertEqual(0,result.returncode,result.stdout+result.stderr)
         self.assertIn("PASS:",result.stdout)
+
+
+class RingerBuildStringTests(unittest.TestCase):
+    def test_real_repository_build_string(self) -> None:
+        result = ringer.ringer_build_string(Path(ringer.__file__).resolve().parent)
+        self.assertRegex(result or "", r"^[0-9a-f]+ · \d{4}-\d{2}-\d{2}(?: · dirty)?$")
+
+    def test_directory_without_git_returns_none(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            self.assertIsNone(ringer.ringer_build_string(Path(temp)))
+
+    def test_failed_show_returns_none(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / ".git").mkdir()
+
+            def runner(args, **kwargs):
+                return subprocess.CompletedProcess(args, 1, stdout="", stderr="failed")
+
+            self.assertIsNone(ringer.ringer_build_string(repo, runner=runner))
+
+    def test_dirty_suffix_only_appears_for_dirty_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / ".git").mkdir()
+
+            def fake_runner(status_output):
+                def runner(args, **kwargs):
+                    stdout = status_output if "status" in args else "abc1234 2026-10-29\n"
+                    return subprocess.CompletedProcess(args, 0, stdout=stdout, stderr="")
+
+                return runner
+
+            clean = ringer.ringer_build_string(repo, runner=fake_runner(""))
+            dirty = ringer.ringer_build_string(repo, runner=fake_runner(" M ringer.py\n"))
+
+            self.assertEqual("abc1234 · 2026-10-29", clean)
+            self.assertEqual("abc1234 · 2026-10-29 · dirty", dirty)
 
 
 if __name__ == "__main__":
