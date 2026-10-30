@@ -187,6 +187,15 @@ It installs the ringer skill — the orchestrator playbook — user-level for Cl
 
 The hooks never block anything. A user who says "just do it inline" is obeyed; uninstall with `./ringer.py uninstall-agent`.
 
+As an alternative, install Ringer as a Claude Code plugin inside Claude Code:
+
+```text
+/plugin marketplace add NateBJones-Projects/ringer
+/plugin install ringer@ringer
+```
+
+This installs the same skill and the same two hooks declaratively, without touching `~/.claude/settings.json` directly.
+
 For CI and evals, `config.sample.toml` includes `[engines.mock]` so the enforcement stack can be tested without an API bill.
 
 ## Engines are pluggable

@@ -1,0 +1,35 @@
+{
+  "name": "ringer",
+  "owner": {
+    "name": "Nate Jones Media LLC"
+  },
+  "metadata": {
+    "description": "Ringer runs manifest-driven tasks in parallel across cheap CLI workers and verifies each task by executing a check command."
+  },
+  "plugins": [
+    {
+      "name": "ringer",
+      "description": "Ringer runs manifest-driven tasks in parallel across cheap CLI workers and verifies each task by executing a check command.",
+      "author": {
+        "name": "Nate Jones Media LLC"
+      },
+      "homepage": "https://github.com/NateBJones-Projects/ringer",
+      "repository": "https://github.com/NateBJones-Projects/ringer",
+      "license": "PolyForm Shield License 1.0.0",
+      "keywords": [
+        "orchestration",
+        "swarm",
+        "agents",
+        "verification"
+      ],
+      "source": "./",
+      "category": "development",
+      "tags": [
+        "orchestration",
+        "swarm",
+        "agents",
+        "verification"
+      ]
+    }
+  ]
+}
