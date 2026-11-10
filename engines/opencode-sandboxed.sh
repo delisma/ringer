@@ -69,8 +69,20 @@ cat > "$PROFILE" <<'SBEOF'
 SBEOF
 
 export TMPDIR="$SCRATCH"
+HOST_OC_MODELS="${XDG_CACHE_HOME:-$HOME/.cache}/opencode/models.json"
 export XDG_CACHE_HOME="$SCRATCH/cache"
 mkdir -p "$XDG_CACHE_HOME"
+# Copy the host models.dev list into the scratch cache. Without it, OpenCode
+# uses its built-in model list. Then a slug that is newer than the OpenCode
+# release fails with "Unexpected server error", even after
+# `opencode models openrouter --refresh`. A copy (not a link) keeps the host file read-only.
+if [ -f "$HOST_OC_MODELS" ]; then
+  mkdir -p "$XDG_CACHE_HOME/opencode"
+  cp "$HOST_OC_MODELS" "$XDG_CACHE_HOME/opencode/models.json"
+fi
+# The JVM on macOS ignores TMPDIR and uses /var/folders/.../T, which the profile
+# blocks. Without this, Grape/Ivy/Maven downloads fail with "Operation not permitted".
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Djava.io.tmpdir=$SCRATCH"
 
 # Run as a child (not exec) so the EXIT trap fires and cleans up the profile +
 # scratch dir even on the success path; propagate the child's exit status.
