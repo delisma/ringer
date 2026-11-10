@@ -119,3 +119,24 @@ lab = "Meta"
 confidence = "verified"
 source = "manifest model field; OpenRouter slug meta-llama/llama-3.3-70b-instruct:free"
 last_verified = 2026-07-10
+
+[engines.opencode.models."openrouter/nvidia/nemotron-3.5-lightning:free"]
+display = "Nemotron 3.5 Lightning (free)"
+lab = "NVIDIA"
+confidence = "catalog"
+source = "manifest model field; OpenRouter catalog name 'NVIDIA: Nemotron 3.5 Lightning (free)'; lab page not yet checked"
+last_verified = 2026-11-10
+
+[engines.opencode.models."openrouter/recursive/flint-v1.0:free"]
+display = "Flint v1.0 (free)"
+lab = "Recursive"
+confidence = "catalog"
+source = "manifest model field; OpenRouter catalog name 'Recursive: Flint (free)'; lab page not yet checked"
+last_verified = 2026-11-10
+
+[engines.opencode.models."openrouter/xingchen-agi/xing4.0-29b-a4b:free"]
+display = "Xing4.0 29B A4B (free)"
+lab = "XingChen AGI"
+confidence = "catalog"
+source = "manifest model field; OpenRouter catalog name 'XingChen: Xing4.0 29B A4B (free)'; lab page not yet checked"
+last_verified = 2026-11-10
