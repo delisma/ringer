@@ -71,6 +71,9 @@ SBEOF
 export TMPDIR="$SCRATCH"
 export XDG_CACHE_HOME="$SCRATCH/cache"
 mkdir -p "$XDG_CACHE_HOME"
+# The JVM on macOS ignores TMPDIR and uses /var/folders/.../T, which the profile
+# blocks. Without this, Grape/Ivy/Maven downloads fail with "Operation not permitted".
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Djava.io.tmpdir=$SCRATCH"
 
 # Run as a child (not exec) so the EXIT trap fires and cleans up the profile +
 # scratch dir even on the success path; propagate the child's exit status.
