@@ -74,7 +74,9 @@ Python floor is 3.12 (README states it; CI only ever ran 3.12).
 - **Refresh OpenCode's model list before auditioning a new OpenRouter slug.** OpenCode rejects any
   model missing from its cached models.dev list with `Unexpected server error` after ~3s and rc=1,
   which looks exactly like a model failure in the scoreboard. Run
-  `opencode models openrouter --refresh` first.
+  `opencode models openrouter --refresh` first. The sandbox wrapper gives each worker an empty
+  `XDG_CACHE_HOME`, so `engines/opencode-sandboxed.sh` copies `~/.cache/opencode/models.json`
+  into it. Without that copy the refresh never reaches a sandboxed worker (found 2026-11-10).
 - **Keep OpenCode lanes at `max_parallel` 1–2.** Concurrent OpenCode workers collide on
   `~/.local/share/opencode/opencode.db` (`database is locked`, instant rc=1). Seen at 8 parallel and
   at 2, with a 352 MB db.
